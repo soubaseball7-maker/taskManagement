@@ -35,7 +35,10 @@ button.danger{ color:var(--danger); }
 button.danger:hover{ background:var(--danger-soft); }
 button.block{ width:100%; }
 
-.layout{ display:grid; grid-template-columns:220px 1fr 360px; height:calc(100vh - 53px); }
+.layout{ display:grid; grid-template-columns:220px 1fr 6px 360px; height:calc(100vh - 53px); }
+
+.resizer{ cursor:col-resize; background:transparent; }
+.resizer:hover, .resizer.dragging{ background:var(--accent); }
 
 aside{ background:var(--panel); border-right:1px solid var(--border); padding:18px 16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
 aside h2{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin:0 0 4px; font-weight:700; }
@@ -131,6 +134,8 @@ textarea{ width:100%; font-size:13px; padding:8px; border:1px solid var(--border
     <div class="tree-head"><span>タスク名</span><span>ステータス</span><span>期限</span></div>
     <div id="tree"></div>
   </main>
+
+  <div id="resizer" class="resizer"></div>
 
   <section id="detail"></section>
 </div>
@@ -551,6 +556,41 @@ document.getElementById('btnResume').onclick = async function(){
 };
 
 document.getElementById('btnSaveNow').onclick = function(){ autoSave(); };
+
+// ---- タスク一覧／タスク詳細の幅調整（マウスドラッグ） ----
+// 幅は記憶せず、アプリを開き直すたびに既定幅（360px）に戻る。
+// ステータス列（aside）の幅は固定で調整対象に含めない。
+(function(){
+  var layout = document.querySelector('.layout');
+  var resizer = document.getElementById('resizer');
+  var ASIDE_WIDTH = 220, RESIZER_WIDTH = 6;
+  var MIN_DETAIL_WIDTH = 260, MAX_DETAIL_WIDTH = 640;
+  var MIN_MAIN_WIDTH = 280; // タスク一覧が狭くなりすぎないための下限
+
+  resizer.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    resizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onMouseMove(e){
+      var maxByMain = window.innerWidth - ASIDE_WIDTH - RESIZER_WIDTH - MIN_MAIN_WIDTH;
+      var maxWidth = Math.min(MAX_DETAIL_WIDTH, maxByMain);
+      var newWidth = window.innerWidth - e.clientX;
+      newWidth = Math.max(MIN_DETAIL_WIDTH, Math.min(newWidth, maxWidth));
+      layout.style.gridTemplateColumns = ASIDE_WIDTH + 'px 1fr ' + RESIZER_WIDTH + 'px ' + newWidth + 'px';
+    }
+    function onMouseUp(){
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+})();
 
 async function init(){
   computeHidden();
