@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>タスク管理</title>
+<style>
+:root{
+  --bg:#eef0f3; --panel:#ffffff; --border:#d7dbe1; --text:#1c1f24; --muted:#6b7280;
+  --accent:#3b5bdb; --accent-soft:#e6eaf9;
+  --notstarted-fg:#5b6270; --notstarted-bg:#e8eaee;
+  --inprogress-fg:#9a5a10; --inprogress-bg:#fbe6c8;
+  --done-fg:#1f7a4d; --done-bg:#dcf1e2;
+  --danger:#b3402a; --danger-soft:#f7e3dd;
+  --shadow:0 1px 2px rgba(20,22,30,.06), 0 4px 10px rgba(20,22,30,.05);
+}
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:"Yu Gothic UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+button, select, input, textarea{ font-family:inherit; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+header{ display:flex; align-items:center; gap:12px; padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--border); box-shadow:var(--shadow); position:relative; z-index:1; }
+header h1{ font-size:17px; margin:0; font-weight:700; letter-spacing:.02em; }
+#status{ font-size:12px; color:var(--muted); }
+.spacer{ flex:1; }
+
+.banner{ display:flex; align-items:center; gap:12px; padding:10px 20px; background:var(--accent-soft); border-bottom:1px solid var(--border); font-size:13px; }
+.banner[hidden]{ display:none; }
+.banner p{ margin:0; flex:1; }
+
+button{ font-size:13px; padding:7px 14px; border:1px solid var(--border); border-radius:6px; background:var(--panel); color:var(--text); cursor:pointer; }
+button:hover{ background:var(--bg); }
+button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+button.primary:hover{ filter:brightness(1.08); }
+button.danger{ color:var(--danger); }
+button.danger:hover{ background:var(--danger-soft); }
+button.block{ width:100%; }
+
+.layout{ display:grid; grid-template-columns:220px 1fr 360px; height:calc(100vh - 53px); }
+
+aside{ background:var(--panel); border-right:1px solid var(--border); padding:18px 16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+aside h2{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin:0 0 4px; font-weight:700; }
+.filter-row{ display:flex; align-items:center; gap:8px; padding:5px 4px; border-radius:6px; font-size:13.5px; }
+.filter-row:hover{ background:var(--bg); }
+.filter-row input{ accent-color:var(--accent); width:15px; height:15px; }
+aside .note{ font-size:11.5px; color:var(--muted); line-height:1.6; margin:2px 0 4px; }
+aside .divider{ border-top:1px solid var(--border); margin:6px 0; }
+
+main{ overflow-y:auto; background:var(--panel); }
+.tree-head{ display:grid; grid-template-columns:1fr 100px 80px; gap:8px; padding:10px 16px; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--panel); }
+
+.row{ display:grid; grid-template-columns:1fr 100px 80px; gap:8px; align-items:center; padding:8px 16px; cursor:pointer; border-bottom:1px solid var(--border); border-left:3px solid transparent; }
+.row:hover{ background:var(--bg); }
+.row.selected{ background:var(--accent-soft); border-left-color:var(--accent); }
+
+.name-cell{ display:flex; align-items:center; gap:6px; min-width:0; }
+.twisty{ display:inline-flex; align-items:center; justify-content:center; width:16px; color:var(--muted); font-size:10px; flex-shrink:0; }
+.name-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.pill{ display:inline-block; font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; width:fit-content; white-space:nowrap; }
+.pill.notstarted{ color:var(--notstarted-fg); background:var(--notstarted-bg); }
+.pill.inprogress{ color:var(--inprogress-fg); background:var(--inprogress-bg); }
+.pill.done{ color:var(--done-fg); background:var(--done-bg); }
+
+.due{ font-size:12.5px; color:var(--muted); }
+
+#detail{ border-left:1px solid var(--border); background:var(--panel); padding:20px 22px; overflow-y:auto; display:flex; flex-direction:column; }
+.path{ font-size:11.5px; color:var(--muted); margin:0 0 10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fName{ font-size:17px; font-weight:700; border:1px solid transparent; border-radius:6px; padding:6px 7px; margin:0 0 14px -7px; width:100%; }
+.fName:hover{ border-color:var(--border); }
+.fName:focus{ border-color:var(--accent); outline:none; background:var(--bg); }
+
+.fieldrow{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.field label{ display:block; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:6px; }
+.field select, .field input{ width:100%; padding:7px 8px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--panel); color:var(--text); }
+.field .auto-note{ font-size:11.5px; color:var(--muted); margin:6px 0 0; }
+
+.btnrow{ display:flex; gap:8px; margin-bottom:20px; }
+
+.section-title{ font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700; margin:0 0 8px; }
+
+.comments{ overflow-y:auto; max-height:280px; margin-bottom:10px; padding-right:2px; }
+.comment{ padding:9px 0; border-bottom:1px solid var(--border); }
+.comment:last-child{ border-bottom:none; }
+.cdate{ display:inline-block; font-size:11px; color:var(--accent); background:var(--accent-soft); padding:2px 7px; border-radius:5px; margin-bottom:5px; }
+.comment p{ margin:0; font-size:13.5px; line-height:1.6; white-space:pre-wrap; }
+
+.detail-footer{ margin-top:auto; padding-top:12px; border-top:1px solid var(--border); }
+textarea{ width:100%; font-size:13px; padding:8px; border:1px solid var(--border); border-radius:6px; min-height:56px; resize:vertical; margin-bottom:8px; }
+.add-row{ display:flex; justify-content:flex-end; }
+
+.empty{ color:var(--muted); font-size:13.5px; padding:14px 2px; line-height:1.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>タスク管理</h1>
+  <span id="status"></span>
+  <span class="spacer"></span>
+  <button id="btnSaveNow">今すぐ保存</button>
+  <button id="btnRelink">別のファイルを開く</button>
+</header>
+
+<div id="setupBanner" class="banner" hidden>
+  <p>初回のみ、task.json の場所を選択してください（アプリと同じフォルダにある task.json を選ぶか、無ければそのファイル名で新規作成してください）。</p>
+  <button id="btnSetup" class="primary">task.json を選択／作成</button>
+</div>
+
+<div id="resumeBanner" class="banner" hidden>
+  <p>前回選択した task.json への書き込み許可を、ブラウザの仕様上もう一度確認する必要があります。</p>
+  <button id="btnResume" class="primary">アクセスを許可</button>
+</div>
+
+<div class="layout">
+  <aside>
+    <h2>ステータス絞り込み</h2>
+    <label class="filter-row"><input type="checkbox" class="filter" value="notstarted" checked>未着手</label>
+    <label class="filter-row"><input type="checkbox" class="filter" value="inprogress" checked>対応中</label>
+    <label class="filter-row"><input type="checkbox" class="filter" value="done" checked>完了</label>
+    <button id="btnApply">適用</button>
+    <p class="note">チェックの変更は「適用」を押すまで反映されません。</p>
+    <div class="divider"></div>
+    <div class="field">
+      <label>追加先の親タスク</label>
+      <select id="parentSelect"><option value="">（ルートに追加）</option></select>
+    </div>
+    <button id="btnNew" class="primary block">＋ 新規タスク</button>
+  </aside>
+
+  <main>
+    <div class="tree-head"><span>タスク名</span><span>ステータス</span><span>期限</span></div>
+    <div id="tree"></div>
+  </main>
+
+  <section id="detail"></section>
+</div>
+
+<script>
+var STATUS_LABEL = { notstarted:'未着手', inprogress:'対応中', done:'完了' };
+var tasks = [];
+var fileHandle = null;
+var appliedFilters = { notstarted:true, inprogress:true, done:true };
+var hiddenIds = new Set(); // 「適用」を押した時点のフィルタ結果を固定して保持する
+var selectedId = null;
+var openIds = new Set();
+
+function uid(){ return 't' + Math.random().toString(36).slice(2,9); }
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function todayISO(){
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+}
+function formatDue(iso){
+  if(!iso) return '—';
+  var p = iso.split('-');
+  return p.length===3 ? (p[1] + '/' + p[2]) : iso;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+function computeStatus(node){
+  if(!node.children || node.children.length===0) return node.status || 'notstarted';
+  var list = node.children.map(computeStatus);
+  if(list.every(function(s){ return s==='done'; })) return 'done';
+  if(list.every(function(s){ return s==='notstarted'; })) return 'notstarted';
+  return 'inprogress';
+}
+
+function matchesFilter(node){
+  if(appliedFilters[computeStatus(node)]) return true;
+  return (node.children||[]).some(matchesFilter);
+}
+
+// 「適用」ボタン押下時にのみ呼び出す。以降タスクのステータスが変わっても
+// 再度「適用」を押すまで一覧の表示・非表示は変わらない。
+function computeHidden(){
+  hiddenIds = new Set();
+  function walk(list){
+    list.forEach(function(node){
+      if(!matchesFilter(node)) hiddenIds.add(node.id);
+      if(node.children) walk(node.children);
+    });
+  }
+  walk(tasks);
+}
+
+function findNode(id, list){
+  list = list || tasks;
+  for(var i=0;i<list.length;i++){
+    if(list[i].id===id) return list[i];
+    if(list[i].children){ var f=findNode(id,list[i].children); if(f) return f; }
+  }
+  return null;
+}
+
+function findParentArray(id, list){
+  list = list || tasks;
+  for(var i=0;i<list.length;i++){
+    if(list[i].id===id) return list;
+    if(list[i].children){ var f=findParentArray(id,list[i].children); if(f) return f; }
+  }
+  return null;
+}
+
+function findParentId(id, list, parentId){
+  list = list || tasks; parentId = (parentId===undefined) ? null : parentId;
+  for(var i=0;i<list.length;i++){
+    if(list[i].id===id) return parentId;
+    if(list[i].children){
+      var r = findParentId(id, list[i].children, list[i].id);
+      if(r!==undefined) return r;
+    }
+  }
+  return undefined;
+}
+
+function collectIdsInSubtree(node, set){
+  set.add(node.id);
+  (node.children||[]).forEach(function(c){ collectIdsInSubtree(c, set); });
+}
+
+// 移動先の親タスク選択肢を作る。自分自身・自分の子孫は選べない（循環を防ぐため）。
+function buildParentOptions(nodeId, currentParentId){
+  var disallowed = new Set();
+  collectIdsInSubtree(findNode(nodeId), disallowed);
+  var html = '<option value=""' + (currentParentId ? '' : ' selected') + '>（ルートに移動）</option>';
+  function walk(list, depth){
+    list.forEach(function(n){
+      if(disallowed.has(n.id)) return;
+      html += '<option value="'+n.id+'"'+(n.id===currentParentId?' selected':'')+'>' + '　'.repeat(depth) + escapeHtml(n.name) + '</option>';
+      if(n.children) walk(n.children, depth+1);
+    });
+  }
+  walk(tasks, 0);
+  return html;
+}
+
+function moveTask(id, newParentId){
+  var node = findNode(id);
+  if(!node) return;
+  var oldArr = findParentArray(id);
+  oldArr.splice(oldArr.indexOf(node), 1);
+  if(newParentId){
+    var newParent = findNode(newParentId);
+    if(!newParent){ tasks.push(node); return; }
+    if(!newParent.children) newParent.children = [];
+    delete newParent.status;
+    newParent.children.push(node);
+    openIds.add(newParent.id);
+  } else {
+    tasks.push(node);
+  }
+}
+
+function findPath(id, list, trail){
+  list = list || tasks; trail = trail || [];
+  for(var i=0;i<list.length;i++){
+    var t = trail.concat([list[i]]);
+    if(list[i].id===id) return t;
+    if(list[i].children){ var f=findPath(id,list[i].children,t); if(f) return f; }
+  }
+  return null;
+}
+
+function renderTree(){
+  var box = document.getElementById('tree');
+  box.innerHTML = '';
+  if(tasks.length===0){
+    box.innerHTML = '<p class="empty">タスクがありません。「＋ 新規タスク」で作成してください。</p>';
+    return;
+  }
+  function walk(list, depth){
+    list.forEach(function(node){
+      if(hiddenIds.has(node.id)) return;
+      var hasChildren = node.children && node.children.length>0;
+      var status = computeStatus(node);
+
+      var row = document.createElement('div');
+      row.className = 'row' + (node.id===selectedId ? ' selected' : '');
+
+      // タスク名セル（開閉矢印＋階層インデントはこのセル内に閉じ込め、他の列とはズレさせない）
+      var nameCell = document.createElement('span');
+      nameCell.className = 'name-cell';
+      nameCell.style.paddingLeft = (depth*18) + 'px';
+
+      var twisty = document.createElement('span');
+      twisty.className = 'twisty';
+      twisty.textContent = hasChildren ? (openIds.has(node.id) ? '▼' : '▶') : '';
+      twisty.onclick = function(e){
+        e.stopPropagation();
+        if(!hasChildren) return;
+        openIds.has(node.id) ? openIds.delete(node.id) : openIds.add(node.id);
+        renderTree();
+      };
+      nameCell.appendChild(twisty);
+
+      var nameText = document.createElement('span');
+      nameText.className = 'name-text';
+      nameText.textContent = node.name;
+      nameCell.appendChild(nameText);
+
+      var pill = document.createElement('span');
+      pill.className = 'pill ' + status;
+      pill.textContent = STATUS_LABEL[status];
+
+      var due = document.createElement('span');
+      due.className = 'due';
+      due.textContent = formatDue(node.due);
+
+      row.appendChild(nameCell);
+      row.appendChild(pill);
+      row.appendChild(due);
+      row.onclick = function(){ selectedId = node.id; renderTree(); renderDetail(); };
+      box.appendChild(row);
+
+      if(hasChildren && openIds.has(node.id)) walk(node.children, depth+1);
+    });
+  }
+  walk(tasks, 0);
+  renderParentOptions();
+}
+
+function renderParentOptions(){
+  var sel = document.getElementById('parentSelect');
+  var prev = sel.value;
+  var html = '<option value="">（ルートに追加）</option>';
+  function walk(list, depth){
+    list.forEach(function(n){
+      html += '<option value="' + n.id + '">' + '　'.repeat(depth) + escapeHtml(n.name) + '</option>';
+      if(n.children) walk(n.children, depth+1);
+    });
+  }
+  walk(tasks, 0);
+  sel.innerHTML = html;
+  sel.value = findNode(prev) ? prev : '';
+}
+
+function renderDetail(){
+  var el = document.getElementById('detail');
+  var node = findNode(selectedId);
+  if(!node){ el.innerHTML = '<p class="empty">左の一覧からタスクを選択してください。</p>'; return; }
+
+  var path = findPath(selectedId).map(function(n){ return n.name; }).join(' › ');
+  var hasChildren = node.children && node.children.length>0;
+  var status = computeStatus(node);
+  var comments = node.comments || [];
+  var currentParentId = findParentId(node.id) || '';
+
+  var statusHtml = hasChildren
+    ? '<span class="pill ' + status + '">' + STATUS_LABEL[status] + '</span><p class="auto-note">子タスクの状況から自動算出</p>'
+    : '<select id="fStatus">' +
+        ['notstarted','inprogress','done'].map(function(s){
+          return '<option value="'+s+'"'+(node.status===s?' selected':'')+'>'+STATUS_LABEL[s]+'</option>';
+        }).join('') +
+      '</select>';
+
+  var commentsHtml = comments.length
+    ? comments.slice().reverse().map(function(c){
+        return '<div class="comment"><span class="cdate">'+escapeHtml(c.date)+'</span><p>'+escapeHtml(c.text)+'</p></div>';
+      }).join('')
+    : '<p class="empty">コメントはありません。</p>';
+
+  el.innerHTML =
+    '<p class="path">' + escapeHtml(path) + '</p>' +
+    '<input id="fName" class="fName" value="' + escapeHtml(node.name) + '">' +
+    '<div class="fieldrow">' +
+      '<div class="field"><label>ステータス</label>' + statusHtml + '</div>' +
+      '<div class="field"><label>期限</label><input type="date" id="fDue" value="' + escapeHtml(node.due||'') + '"></div>' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:16px;"><label>親タスク</label><select id="fParent">' + buildParentOptions(node.id, currentParentId) + '</select></div>' +
+    '<div class="btnrow">' +
+      '<button id="btnAddChild">＋ 子タスクを追加</button>' +
+      '<button id="btnDelete" class="danger">削除</button>' +
+    '</div>' +
+    '<p class="section-title">コメントログ（' + comments.length + '件）</p>' +
+    '<div class="comments">' + commentsHtml + '</div>' +
+    '<div class="detail-footer">' +
+      '<textarea id="fComment" placeholder="状況を記録する（積み上げ式で履歴に残ります）"></textarea>' +
+      '<div class="add-row"><button id="btnAddComment" class="primary">追加</button></div>' +
+    '</div>';
+
+  document.getElementById('fName').onchange = function(e){ node.name = e.target.value || node.name; renderTree(); autoSave(); };
+  document.getElementById('fDue').onchange = function(e){ node.due = e.target.value; renderTree(); autoSave(); };
+  if(!hasChildren){
+    document.getElementById('fStatus').onchange = function(e){ node.status = e.target.value; renderTree(); renderDetail(); autoSave(); };
+  }
+  document.getElementById('fParent').onchange = function(e){
+    moveTask(node.id, e.target.value || null);
+    renderTree(); renderDetail(); autoSave();
+  };
+  document.getElementById('btnAddChild').onclick = function(){
+    if(!node.children) node.children = [];
+    delete node.status;
+    var c = { id: uid(), name:'新規タスク', status:'notstarted', due:'', comments:[] };
+    node.children.push(c);
+    openIds.add(node.id);
+    selectedId = c.id;
+    renderTree(); renderDetail(); autoSave();
+  };
+  document.getElementById('btnDelete').onclick = function(){
+    if(!confirm('「' + node.name + '」を削除しますか？子タスクも含めて削除されます。')) return;
+    var arr = findParentArray(node.id);
+    arr.splice(arr.indexOf(node), 1);
+    hiddenIds.delete(node.id);
+    selectedId = null;
+    renderTree(); renderDetail(); autoSave();
+  };
+  document.getElementById('btnAddComment').onclick = function(){
+    var ta = document.getElementById('fComment');
+    var text = ta.value.trim();
+    if(!text) return;
+    var now = new Date();
+    var date = pad2(now.getMonth()+1) + '/' + pad2(now.getDate()) + ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    if(!node.comments) node.comments = [];
+    node.comments.push({ date:date, text:text });
+    renderTree(); renderDetail(); autoSave();
+  };
+}
+
+document.getElementById('btnApply').onclick = function(){
+  document.querySelectorAll('.filter').forEach(function(cb){ appliedFilters[cb.value] = cb.checked; });
+  computeHidden();
+  renderTree();
+};
+
+document.getElementById('btnNew').onclick = function(){
+  var parentId = document.getElementById('parentSelect').value;
+  var t = { id: uid(), name:'新規タスク', status:'notstarted', due:'', comments:[] };
+  var parent = parentId ? findNode(parentId) : null;
+  if(parent){
+    if(!parent.children) parent.children = [];
+    delete parent.status;
+    parent.children.push(t);
+    openIds.add(parent.id);
+  } else {
+    tasks.push(t);
+  }
+  selectedId = t.id;
+  renderTree(); renderDetail(); autoSave();
+};
+
+// ---- 保存先ファイルの記憶（IndexedDB） ----
+// File System Access API のハンドルを保存しておくと、次回このアプリを開いたときに
+// ファイル選択なしで自動的に同じ task.json を読み込める（ブラウザの権限が有効な間）。
+var DB_NAME = 'taskAppDB', STORE_NAME = 'handles', HANDLE_KEY = 'taskFileHandle';
+function openDB(){
+  return new Promise(function(resolve, reject){
+    var req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = function(){ req.result.createObjectStore(STORE_NAME); };
+    req.onsuccess = function(){ resolve(req.result); };
+    req.onerror = function(){ reject(req.error); };
+  });
+}
+async function saveHandleToDB(handle){
+  var db = await openDB();
+  return new Promise(function(resolve, reject){
+    var tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(handle, HANDLE_KEY);
+    tx.oncomplete = function(){ resolve(); };
+    tx.onerror = function(){ reject(tx.error); };
+  });
+}
+async function loadHandleFromDB(){
+  var db = await openDB();
+  return new Promise(function(resolve, reject){
+    var tx = db.transaction(STORE_NAME, 'readonly');
+    var req = tx.objectStore(STORE_NAME).get(HANDLE_KEY);
+    req.onsuccess = function(){ resolve(req.result || null); };
+    req.onerror = function(){ reject(req.error); };
+  });
+}
+
+function setStatus(text){ document.getElementById('status').textContent = text; }
+function nowTimeLabel(){
+  var d = new Date();
+  return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+}
+function showBanner(which){
+  document.getElementById('setupBanner').hidden = which !== 'setup';
+  document.getElementById('resumeBanner').hidden = which !== 'resume';
+}
+function hideBanners(){ showBanner(null); }
+
+var pendingHandle = null;
+
+// 選択されたファイルを読み込み、以後の自動保存の対象にする。
+// JSONとして壊れている場合は自動保存を有効化せず、上書きによるデータ消失を防ぐ。
+async function attachHandle(handle){
+  var text;
+  try{
+    var file = await handle.getFile();
+    text = await file.text();
+  }catch(e){
+    setStatus('task.json の読み込みに失敗しました');
+    return;
+  }
+  var parsed;
+  try{
+    parsed = text.trim() ? JSON.parse(text) : [];
+  }catch(e){
+    setStatus('task.json の内容がJSON形式として不正です。ファイルを確認するか、別のファイルを選び直してください。');
+    return;
+  }
+  tasks = parsed;
+  fileHandle = handle;
+  hideBanners();
+  saveHandleToDB(handle).catch(function(){});
+  selectedId = null; openIds.clear();
+  computeHidden();
+  renderTree(); renderDetail();
+  setStatus('task.json ・ 読み込み済み');
+}
+
+async function autoSave(){
+  if(!fileHandle) return;
+  try{
+    var writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(tasks, null, 2));
+    await writable.close();
+    setStatus('task.json ・ 保存済み ' + nowTimeLabel());
+  }catch(e){
+    setStatus('task.json ・ 保存に失敗しました（「別のファイルを開く」から選び直してください）');
+  }
+}
+
+document.getElementById('btnSetup').onclick = async function(){
+  try{
+    var handle = await window.showSaveFilePicker({ suggestedName:'task.json', types:[{ description:'JSON', accept:{ 'application/json':['.json'] } }] });
+    await attachHandle(handle);
+  }catch(e){ /* キャンセル時は何もしない */ }
+};
+
+document.getElementById('btnRelink').onclick = async function(){
+  try{
+    var handle = await window.showSaveFilePicker({ suggestedName:'task.json', types:[{ description:'JSON', accept:{ 'application/json':['.json'] } }] });
+    await attachHandle(handle);
+  }catch(e){ /* キャンセル時は何もしない */ }
+};
+
+document.getElementById('btnResume').onclick = async function(){
+  try{
+    var perm = await pendingHandle.requestPermission({ mode:'readwrite' });
+    if(perm === 'granted'){ await attachHandle(pendingHandle); }
+    else { showBanner('setup'); }
+  }catch(e){ showBanner('setup'); }
+};
+
+document.getElementById('btnSaveNow').onclick = function(){ autoSave(); };
+
+async function init(){
+  computeHidden();
+  renderTree(); renderDetail();
+  var handle = await loadHandleFromDB().catch(function(){ return null; });
+  if(handle){
+    var perm = await handle.queryPermission({ mode:'readwrite' }).catch(function(){ return 'denied'; });
+    if(perm === 'granted'){ await attachHandle(handle); return; }
+    if(perm === 'prompt'){ pendingHandle = handle; showBanner('resume'); return; }
+  }
+  showBanner('setup');
+}
+init();
+</script>
+</body>
+</html>
