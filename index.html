@@ -2,6 +2,15 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<script>
+// ライト／ダークモードの初期判定（FOUC防止のため、CSS適用前にここで確定させる）
+(function(){
+  var saved = localStorage.getItem('theme');
+  var dark = saved ? saved === 'dark'
+    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if(dark) document.documentElement.setAttribute('data-theme', 'dark');
+})();
+</script>
 <title>タスク管理</title>
 <style>
 :root{
@@ -13,6 +22,18 @@
   --danger:#b3402a; --danger-soft:#f7e3dd;
   --shadow:0 1px 2px rgba(20,22,30,.06), 0 4px 10px rgba(20,22,30,.05);
 }
+:root[data-theme="dark"]{
+  --bg:#14161a; --panel:#1e2128; --border:#383e48; --text:#e6e8ec; --muted:#9aa1ac;
+  --accent:#6f8cf7; --accent-soft:#22294a;
+  --notstarted-fg:#c3c8d1; --notstarted-bg:#2c2f36;
+  --inprogress-fg:#ffcf86; --inprogress-bg:#4a3110;
+  --done-fg:#7fe0a8; --done-bg:#123a26;
+  --danger:#ff8a70; --danger-soft:#4a1f16;
+  --shadow:0 1px 2px rgba(0,0,0,.6), 0 4px 10px rgba(0,0,0,.45);
+}
+/* --accentをダーク用に明るくした関係で、button.primaryの白文字(下記button.primary定義)は
+   コントラスト不足になるため、ダーク時のみ濃紺文字に上書きする */
+:root[data-theme="dark"] button.primary{ color:#0b1020; }
 *{ box-sizing:border-box; }
 body{ margin:0; font-family:"Yu Gothic UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
 button, select, input, textarea{ font-family:inherit; }
@@ -34,6 +55,17 @@ button.primary:hover{ filter:brightness(1.08); }
 button.danger{ color:var(--danger); }
 button.danger:hover{ background:var(--danger-soft); }
 button.block{ width:100%; }
+
+/* ライト／ダークモード切り替えスイッチ */
+.theme-switch{ display:inline-flex; align-items:center; cursor:pointer; }
+.theme-switch input{ position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+.theme-switch .track{ position:relative; display:inline-block; width:42px; height:23px; border-radius:999px; background:var(--border); transition:background .15s ease; }
+.theme-switch .thumb{ position:absolute; top:2px; left:2px; width:19px; height:19px; border-radius:50%; background:var(--panel); box-shadow:var(--shadow); transition:transform .15s ease; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; }
+.theme-switch .thumb::before{ content:"☀️"; }
+.theme-switch input:checked ~ .track{ background:var(--accent); }
+.theme-switch input:checked ~ .track .thumb{ transform:translateX(19px); }
+.theme-switch input:checked ~ .track .thumb::before{ content:"🌙"; }
+.theme-switch input:focus-visible ~ .track{ outline:2px solid var(--accent); outline-offset:2px; }
 
 .layout{ display:grid; grid-template-columns:220px 1fr 6px 360px; height:calc(100vh - 53px); }
 
@@ -100,6 +132,10 @@ textarea{ width:100%; font-size:13px; padding:8px; border:1px solid var(--border
   <h1>タスク管理</h1>
   <span id="status"></span>
   <span class="spacer"></span>
+  <label class="theme-switch" id="themeSwitch" title="ライト／ダークモードの切り替え">
+    <input type="checkbox" id="themeToggle" aria-label="ダークモード切り替え">
+    <span class="track"><span class="thumb"></span></span>
+  </label>
   <button id="btnSaveNow">今すぐ保存</button>
   <button id="btnRelink">別のファイルを開く</button>
 </header>
@@ -556,6 +592,27 @@ document.getElementById('btnResume').onclick = async function(){
 };
 
 document.getElementById('btnSaveNow').onclick = function(){ autoSave(); };
+
+// ---- ライト／ダークモード切り替え ----
+// 選択したテーマはlocalStorageに保存する（task.json本体とは別の、UI設定専用の永続化）。
+// 初回アクセス（未選択）時はOSのprefers-color-schemeを尊重し、以後はユーザーの明示選択を優先する。
+var THEME_KEY = 'theme';
+function applyTheme(theme){
+  if(theme === 'dark'){ document.documentElement.setAttribute('data-theme', 'dark'); }
+  else{ document.documentElement.removeAttribute('data-theme'); }
+  document.getElementById('themeToggle').checked = (theme === 'dark');
+}
+function getInitialTheme(){
+  var saved = localStorage.getItem(THEME_KEY);
+  if(saved === 'dark' || saved === 'light') return saved;
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+applyTheme(getInitialTheme());
+document.getElementById('themeToggle').onchange = function(e){
+  var theme = e.target.checked ? 'dark' : 'light';
+  localStorage.setItem(THEME_KEY, theme);
+  applyTheme(theme);
+};
 
 // ---- タスク一覧／タスク詳細の幅調整（マウスドラッグ） ----
 // 幅は記憶せず、アプリを開き直すたびに既定幅（360px）に戻る。
